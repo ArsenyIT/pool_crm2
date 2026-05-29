@@ -1,0 +1,333 @@
+<!-- templates/child_details.html (исправленная версия) -->
+{% extends "base.html" %}
+
+{% block title %}{{ child.full_name }} - Карточка ученика - Swim CRM{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-child"></i> {{ child.full_name }}</h1>
+        <div>
+            <a href="/parent/profile" class="btn btn-outline">
+                <i class="fas fa-arrow-left"></i> Мои дети
+            </a>
+            {% if current_user.type == 'parent' %}
+                <a href="/apply" class="btn btn-success">
+                    <i class="fas fa-plus"></i> Записать ещё
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="child-dashboard">
+        <!-- Информационная карточка -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-info-circle"></i> Информация об ученике</h3>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ child.age }}</div>
+                        <div class="stat-label">лет</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ child.swimming_years or 1 }}</div>
+                        <div class="stat-label">лет плавания</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ child.desired_lessons_per_week or 2 }}</div>
+                        <div class="stat-label">занятий/неделю</div>
+                    </div>
+                </div>
+
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>ФИО:</label>
+                        <span>{{ child.full_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Класс:</label>
+                        <span>{% if child.class_number and child.class_number > 0 %}{{ child.class_number }} класс{% else %}Детский сад{% endif %}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Школа:</label>
+                        <span>{{ child.school_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Смена:</label>
+                        <span>{% if child.shift == 'day' %}Дневная <i class="fas fa-sun"></i>{% else %}Вечерняя <i class="fas fa-moon"></i>{% endif %}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Стаж плавания:</label>
+                        <span>
+                            {% if child.swimming_years == 1 %}Менее года
+                            {% elif child.swimming_years == 2 %}1-2 года
+                            {% elif child.swimming_years == 3 %}2-3 года
+                            {% else %}Более 3 лет{% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <label>Запись создана:</label>
+                        <span>{{ child.created_at[:10] if child.created_at else '—' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Группа -->
+        {% if group %}
+            <div class="card">
+                <div class="card-header" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+                    <h3><i class="fas fa-users"></i> Текущая группа</h3>
+                </div>
+                <div class="card-body">
+                    <div class="group-info">
+                        <h2 style="color: #2d3748; margin-bottom: 15px;">{{ group.name }}</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Тренер</div>
+                                <div class="stat-number" style="font-size: 1.2rem;">{{ group.trainer_name or 'Не назначен' }}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Смена</div>
+                                <div class="stat-number" style="font-size: 1.2rem;">{% if group.shift == 'day' %}Дневная{% else %}Вечерняя{% endif %}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Дата зачисления</div>
+                                <div class="stat-number" style="font-size: 1rem;">{{ group.enrolled_at[:10] if group.enrolled_at else '—' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Расписание -->
+            {% if schedule %}
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-calendar-week"></i> Расписание занятий</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="schedule-list">
+                            {% set weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'] %}
+                            {% for item in schedule %}
+                                <div class="schedule-item">
+                                    <div class="schedule-day">
+                                        <i class="fas fa-calendar-day"></i> {{ weekdays[item.weekday] }}
+                                    </div>
+                                    <div class="schedule-time">
+                                        <i class="fas fa-clock"></i> {{ item.start_time[:5] }} - {{ item.end_time[:5] }}
+                                    </div>
+                                    <div class="schedule-location">
+                                        <i class="fas fa-map-marker-alt"></i> {{ item.location or 'Дорожка не указана' }}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Посещаемость -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-line"></i> Статистика посещаемости</h3>
+                </div>
+                <div class="card-body">
+                    {# Ручной подсчёт статистики вместо selectattr #}
+                    {% set present_count = 0 %}
+                    {% set absent_count = 0 %}
+                    {% set sick_count = 0 %}
+                    {% set excused_count = 0 %}
+
+                    {% for record in attendance %}
+                        {% if record.status == 'present' %}
+                            {% set present_count = present_count + 1 %}
+                        {% elif record.status == 'absent' %}
+                            {% set absent_count = absent_count + 1 %}
+                        {% elif record.status == 'sick' %}
+                            {% set sick_count = sick_count + 1 %}
+                        {% elif record.status == 'excused' %}
+                            {% set excused_count = excused_count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+
+                    {% set total = attendance|length %}
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number" style="color: #48bb78;">{{ present_count }}</div>
+                            <div class="stat-label">Присутствовал</div>
+                            {% if total > 0 %}
+                                <small>{{ (present_count / total * 100)|round|int }}%</small>
+                            {% endif %}
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" style="color: #ef4444;">{{ absent_count }}</div>
+                            <div class="stat-label">Отсутствовал</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" style="color: #ed8936;">{{ sick_count }}</div>
+                            <div class="stat-label">Болел</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" style="color: #4299e1;">{{ excused_count }}</div>
+                            <div class="stat-label">Уважительная</div>
+                        </div>
+                    </div>
+
+                    {% if attendance %}
+                        <div class="attendance-timeline">
+                            <label>Последние отметки:</label>
+                            <div class="timeline-days">
+                                {% for record in attendance[:14] %}
+                                    <div class="timeline-day {% if record.status == 'present' %}status-present{% elif record.status == 'absent' %}status-absent{% elif record.status == 'sick' %}status-sick{% else %}status-excused{% endif %}"
+                                         title="{{ record.date }}: {% if record.status == 'present' %}Присутствовал{% elif record.status == 'absent' %}Отсутствовал{% elif record.status == 'sick' %}Болел{% else %}Уважительная причина{% endif %}">
+                                        {{ record.date[8:10] }}.{{ record.date[5:7] }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="empty-state text-center py-3">
+                            <p class="text-muted">Нет данных о посещаемости</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="empty-icon">
+                        <i class="fas fa-question-circle fa-4x" style="color: #ed8936;"></i>
+                    </div>
+                    <p style="font-size: 1.1rem;">Ребёнок пока не зачислен ни в одну группу</p>
+                    <small>После зачисления здесь появится информация о расписании и посещаемости</small>
+                    {% if current_user.type == 'parent' %}
+                        <div class="mt-3">
+                            <a href="/apply" class="btn btn-primary">
+                                <i class="fas fa-pen"></i> Подать заявку
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.info-item {
+    padding: 10px;
+    background: #f7fafc;
+    border-radius: 10px;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #4a5568;
+    margin-right: 10px;
+}
+
+.schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 16px;
+    background: #f7fafc;
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+
+.schedule-day {
+    font-weight: 600;
+    color: #2b6cb0;
+    min-width: 140px;
+}
+
+.schedule-time {
+    color: #2d3748;
+}
+
+.schedule-location {
+    color: #718096;
+}
+
+.attendance-timeline {
+    margin-top: 20px;
+}
+
+.timeline-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.timeline-day {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+.status-present {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.status-absent {
+    background: #fed7d7;
+    color: #742a2a;
+}
+
+.status-sick {
+    background: #feebc8;
+    color: #7c2d12;
+}
+
+.status-excused {
+    background: #bee3f8;
+    color: #2c5282;
+}
+
+.empty-state {
+    padding: 40px;
+    text-align: center;
+}
+
+.empty-icon {
+    margin-bottom: 20px;
+    color: #a0aec0;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 15px;
+    background: #f7fafc;
+    border-radius: 16px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
