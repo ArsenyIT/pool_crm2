@@ -6,6 +6,10 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Optional
 from datetime import date, datetime, timedelta
 
+from init_db import verify_password
+
+import os
+
 from fastapi import (
     FastAPI, Request, HTTPException, Depends, status,
     Form, UploadFile, File, Cookie, Query)
@@ -17,11 +21,11 @@ from fastapi.staticfiles import StaticFiles
 from database import db_instance, get_db
 from init_db import create_tables, seed_test_data, ensure_tables_exist
 
+from vk_bot import start_vk_bot, stop_vk_bot
 
 
 # Простая аутентификация (прямое сравнение строк)
-def verify_password(plain: str, stored: str):
-    return plain == stored
+
 
 
 # ------------------- Управление сессиями -------------------
@@ -99,6 +103,15 @@ def get_current_user(
     return None
 
 
+def format_dates_in_dict(data: dict, date_fields: list) -> dict:
+    """Преобразует datetime-поля в строки формата 'YYYY-MM-DD HH:MM:SS'"""
+    for field in date_fields:
+        if field in data and data[field] is not None:
+            if hasattr(data[field], 'strftime'):
+                data[field] = data[field].strftime('%Y-%m-%d %H:%M:%S')
+    return data
+
+
 # Проверка ролей/прав
 def require_parent(current_user: Optional[dict]):
     if not current_user or current_user["type"] != "parent":
@@ -109,10 +122,9 @@ def require_trainer(current_user: Optional[dict]):
         raise HTTPException(status_code=403, detail="Доступ только для тренеров")
 
 def require_admin(current_user: Optional[dict]):
-    if not current_user or current_user["type"] != "trainer" or not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Доступ только для админов")
+    if not current_user or current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Доступ только для администратора")
 
-# Для удобства: комбинированные проверки (например, тренер или админ)
 def require_trainer_or_admin(current_user: Optional[dict]):
     if not current_user or current_user["type"] not in ("trainer", "admin"):
         raise HTTPException(status_code=403, detail="Недостаточно прав")
@@ -231,33 +243,35 @@ def auto_select_group(child_age: int, swimming_years: int, shift: str, db_cursor
 # Жизненный цикл приложения
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Управляет жизненным циклом приложения:
-    - при запуске проверяет и инициализирует БД
-    - при завершении закрывает соединение с БД
-    """
-
+    """Управляет жизненным циклом приложения"""
     print("Запуск приложения...")
 
-    # Проверяем, существуют ли таблицы       ensure_tables_exist() создаёт таблицы, если их нет
-    tables_created = ensure_tables_exist() # и возвращает True, если были созданы
-
-    # Если таблицы были только что созданы, заполняем их тестовыми данными
+    tables_created = ensure_tables_exist()
     if tables_created:
         print("Таблицы созданы, заполняем тестовыми данными...")
         seed_test_data()
-    else: # Таблицы уже существуют. Проверка наличия данных
+    else:
         from database import get_db_cursor
         with get_db_cursor() as cursor:
             cursor.execute("SELECT COUNT(*) FROM trainers")
             if cursor.fetchone()[0] == 0:
                 seed_test_data()
     upgrade_database()
+
+    # ЗАПУСКАЕМ VK БОТА
+    try:
+        from database import get_db_cursor
+        with get_db_cursor() as cursor:
+            start_vk_bot(cursor)
+    except Exception as e:
+        print(f"⚠️ VK Bot startup error: {e}")
+
     print("Приложение готово")
+    yield
 
-    yield  # Здесь работает само приложение
+    # ОСТАНАВЛИВАЕМ VK БОТА
+    stop_vk_bot()
 
-    # Завершение работы
     print("Остановка приложения, закрытие соединения с БД...")
     db_instance.close()
     print("Соединение закрыто")
@@ -288,6 +302,26 @@ async def home(request: Request):
         {"request": request}
     )
 
+
+# ---------- Галерея ----------
+@app.get("/gallery", response_class=HTMLResponse)
+async def gallery_page(request: Request):
+    """ Страница галереи. """
+    return templates.TemplateResponse(request, "gallery.html", {"request": request})
+
+@app.get("/api/gallery/images")
+async def get_gallery_images():
+    """ Возвращает список относительных путей к изображениям из папки static/images/gallery. """
+    gallery_dir = "static/images/gallery"
+    if not os.path.exists(gallery_dir):
+        raise HTTPException(status_code=404, detail="Папка галереи не найдена")
+
+    extensions = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+    images = []
+    for filename in sorted(os.listdir(gallery_dir)):
+        if filename.lower().endswith(extensions):
+            images.append(f"/static/images/gallery/{filename}")
+    return {"images": images}
 
 # ---------- Страница входа для всех пользователей ----------
 @app.get("/login", response_class=HTMLResponse)
@@ -519,12 +553,14 @@ async def parent_profile(
 
 
 # ---------- Профили детей ----------
+# main.py - замените ВСЮ функцию child_details
+
 @app.get("/parent/child/{child_id}", response_class=HTMLResponse)
 async def child_details(
-    request: Request,
-    child_id: int,
-    current_user = Depends(get_current_user),
-    db_cursor = Depends(get_db)
+        request: Request,
+        child_id: int,
+        current_user=Depends(get_current_user),
+        db_cursor=Depends(get_db)
 ):
     """
     Детальная страница ребёнка: информация, группа, расписание, посещаемость.
@@ -537,9 +573,16 @@ async def child_details(
         "SELECT * FROM children WHERE id = ? AND parent_id = ?",
         (child_id, parent_id)
     )
-    child = db_cursor.fetchone()
-    if not child:
+    child_row = db_cursor.fetchone()
+    if not child_row:
         raise HTTPException(status_code=404, detail="Ребёнок не найден")
+
+    # Преобразуем child в словарь
+    child = dict(child_row)
+
+    # Преобразуем created_at если есть
+    if child.get('created_at') and hasattr(child['created_at'], 'strftime'):
+        child['created_at'] = child['created_at'].strftime('%Y-%m-%d %H:%M:%S')
 
     # Текущее зачисление
     db_cursor.execute(
@@ -556,6 +599,10 @@ async def child_details(
     enrollment = db_cursor.fetchone()
     group = dict(enrollment) if enrollment else None
 
+    # Преобразуем enrolled_at в строку, если это datetime
+    if group and group.get('enrolled_at') and hasattr(group['enrolled_at'], 'strftime'):
+        group['enrolled_at'] = group['enrolled_at'].strftime('%Y-%m-%d %H:%M:%S')
+
     # Расписание занятий группы (если есть)
     schedule_items = []
     if group:
@@ -568,13 +615,25 @@ async def child_details(
             """,
             (group["id"],)
         )
-        schedule_items = db_cursor.fetchall()
+        schedule_rows = db_cursor.fetchall()
+        schedule_items = []
+        for row in schedule_rows:
+            item = dict(row)
+            # Преобразуем время, если нужно
+            if item.get('start_time') and hasattr(item['start_time'], 'strftime'):
+                item['start_time'] = item['start_time'].strftime('%H:%M:%S')
+            if item.get('end_time') and hasattr(item['end_time'], 'strftime'):
+                item['end_time'] = item['end_time'].strftime('%H:%M:%S')
+            schedule_items.append(item)
 
     # Посещаемость: последние 30 дней
-    today = date.today()
-    # Найдём enrollment_id для этого ребёнка
+    attendance = []
     if group:
-        db_cursor.execute("SELECT id FROM enrollments WHERE child_id = ? AND is_active = 1", (child_id,))
+        # Найдём enrollment_id для этого ребёнка
+        db_cursor.execute(
+            "SELECT id FROM enrollments WHERE child_id = ? AND group_id = ? AND is_active = 1",
+            (child_id, group["id"])
+        )
         enrollment_record = db_cursor.fetchone()
         if enrollment_record:
             db_cursor.execute(
@@ -587,26 +646,25 @@ async def child_details(
                 """,
                 (enrollment_record["id"],)
             )
-            attendance = db_cursor.fetchall()
-        else:
-            attendance = []
-    else:
-        attendance = []
+            attendance_rows = db_cursor.fetchall()
+            for row in attendance_rows:
+                rec = dict(row)
+                if rec.get('date') and hasattr(rec['date'], 'strftime'):
+                    rec['date'] = rec['date'].strftime('%Y-%m-%d')
+                attendance.append(rec)
 
     return templates.TemplateResponse(
         request,
         "child_details.html",
         {
             "request": request,
-            "child": dict(child),
+            "child": child,
             "group": group,
             "schedule": schedule_items,
             "attendance": attendance,
             "current_user": current_user
         }
     )
-
-
 
 # ======================== ТРЕНЕР ========================
 
@@ -767,18 +825,39 @@ async def add_student_form(
         }
     )
 
+
+# main.py - исправленный фрагмент (замените соответствующие функции)
+
 @app.post("/trainer/group/{group_id}/add_student")
 async def add_student_submit(
-    request: Request,
-    group_id: int,
-    child_id: Annotated[int, Form()],
-    current_user = Depends(get_current_user),
-    db_cursor = Depends(get_db)
+        request: Request,
+        group_id: int,
+        child_id: Annotated[int, Form()],
+        current_user=Depends(get_current_user),
+        db_cursor=Depends(get_db)
 ):
     """Добавляет ученика в группу."""
     require_trainer_or_admin(current_user)
     if not can_manage_group(group_id, current_user, db_cursor):
         raise HTTPException(status_code=403, detail="Нет доступа")
+
+    # Проверяем, существует ли группа
+    db_cursor.execute("SELECT id, max_students FROM groups WHERE id = ?", (group_id,))
+    group = db_cursor.fetchone()
+    if not group:
+        raise HTTPException(status_code=404, detail="Группа не найдена")
+
+    # Проверяем, не переполнена ли группа
+    db_cursor.execute(
+        "SELECT COUNT(*) as cnt FROM enrollments WHERE group_id = ? AND is_active = 1",
+        (group_id,)
+    )
+    enrolled = db_cursor.fetchone()["cnt"]
+    if enrolled >= group["max_students"]:
+        return RedirectResponse(
+            url=f"/trainer/group/{group_id}?error=full",
+            status_code=303
+        )
 
     # Проверяем, не зачислен ли уже
     db_cursor.execute(
@@ -786,7 +865,15 @@ async def add_student_submit(
         (child_id, group_id)
     )
     if db_cursor.fetchone():
-        return RedirectResponse(url=f"/trainer/group/{group_id}?error=already_enrolled", status_code=303)
+        return RedirectResponse(
+            url=f"/trainer/group/{group_id}?error=already_enrolled",
+            status_code=303
+        )
+
+    # Проверяем, существует ли ребёнок
+    db_cursor.execute("SELECT id FROM children WHERE id = ?", (child_id,))
+    if not db_cursor.fetchone():
+        raise HTTPException(status_code=404, detail="Ребёнок не найден")
 
     # Добавляем запись
     db_cursor.execute(
@@ -794,6 +881,21 @@ async def add_student_submit(
         (child_id, group_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     )
     db_cursor.connection.commit()
+
+    # Отправляем уведомление родителю
+    db_cursor.execute(
+        "SELECT parent_id FROM children WHERE id = ?",
+        (child_id,)
+    )
+    child = db_cursor.fetchone()
+    if child:
+        send_notification_to_parent(
+            child["parent_id"],
+            "Зачисление в группу",
+            f"Ваш ребёнок зачислен в группу. Подробности в личном кабинете.",
+            db_cursor
+        )
+
     return RedirectResponse(url=f"/trainer/group/{group_id}?success=added", status_code=303)
 
 @app.post("/trainer/group/{group_id}/remove_student/{child_id}")
@@ -1161,7 +1263,19 @@ async def admin_applications(
 
     query += " ORDER BY created_at DESC"
     db_cursor.execute(query, params)
-    applications = db_cursor.fetchall()
+
+    # Вместо прямого fetchall() преобразование дат
+    rows = db_cursor.fetchall()
+    # Преобразуем каждую заявку
+    applications = []
+    for row in rows:
+        app = dict(row)
+        # Преобразуем поле created_at (и возможно processed_at)
+        if app.get('created_at') and hasattr(app['created_at'], 'strftime'):
+            app['created_at'] = app['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        if app.get('processed_at') and hasattr(app['processed_at'], 'strftime'):
+            app['processed_at'] = app['processed_at'].strftime('%Y-%m-%d %H:%M:%S')
+        applications.append(app)
 
     # Для отображения списка групп в форме одобрения
     db_cursor.execute(
@@ -1315,7 +1429,8 @@ async def approve_application(
     send_notification_to_parent(
         parent_id,
         "Заявка одобрена",
-        f"Ваш ребёнок {app['child_full_name']} зачислен в группу '{group_info['name']}'. Расписание занятий доступно в личном кабинете."
+        f"Ваш ребёнок {app['child_full_name']} зачислен в группу '{group_info['name']}'. Расписание занятий доступно в личном кабинете.",
+        db_cursor
     )
 
     return RedirectResponse(url="/admin/applications?success=approved", status_code=303)
@@ -1635,6 +1750,73 @@ async def delete_group(
     return RedirectResponse(url="/admin/groups?success=deleted", status_code=303)
 
 
+# Добавьте эти эндпоинты в main.py
+
+@app.get("/admin/api/stats")
+async def admin_api_stats(
+        current_user=Depends(get_current_user),
+        db_cursor=Depends(get_db)
+):
+    """API для получения статистики для админ-дашборда."""
+    require_admin(current_user)
+
+    # Новые заявки
+    db_cursor.execute("SELECT COUNT(*) FROM applications WHERE status = 'new'")
+    new_applications = db_cursor.fetchone()[0]
+
+    # Активные группы
+    db_cursor.execute("SELECT COUNT(*) FROM groups WHERE is_active = 1")
+    active_groups = db_cursor.fetchone()[0]
+
+    # Всего учеников (активные зачисления)
+    db_cursor.execute("SELECT COUNT(DISTINCT child_id) FROM enrollments WHERE is_active = 1")
+    total_students = db_cursor.fetchone()[0]
+
+    # Активные тренеры
+    db_cursor.execute("SELECT COUNT(*) FROM trainers WHERE is_active = 1")
+    active_trainers = db_cursor.fetchone()[0]
+
+    return {
+        "new_applications": new_applications,
+        "active_groups": active_groups,
+        "total_students": total_students,
+        "active_trainers": active_trainers
+    }
+
+
+@app.get("/admin/api/recent_applications")
+async def admin_api_recent_applications(
+        current_user=Depends(get_current_user),
+        db_cursor=Depends(get_db)
+):
+    """API для получения последних заявок."""
+    require_admin(current_user)
+
+    db_cursor.execute(
+        """
+        SELECT id, parent_full_name, child_full_name, child_age, status, created_at
+        FROM applications
+        ORDER BY created_at DESC
+        LIMIT 10
+        """
+    )
+    rows = db_cursor.fetchall()
+    # Преобразуем каждую заявку
+    applications = []
+    for row in rows:
+        app = dict(row)
+        # Преобразуем поле created_at (и возможно processed_at)
+        if app.get('created_at') and hasattr(app['created_at'], 'strftime'):
+            app['created_at'] = app['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        if app.get('processed_at') and hasattr(app['processed_at'], 'strftime'):
+            app['processed_at'] = app['processed_at'].strftime('%Y-%m-%d %H:%M:%S')
+        applications.append(app)
+
+    return {
+        "applications": [dict(app) for app in applications]
+    }
+
+
 
 # ======================== ДАШБОРД (ПЕРЕНАПРАВЛЯЕТ ПОЛЬЗОВАТЕЛЯ В ЗАВИСИМОСТИ ОТ РОЛИ) ========================
 
@@ -1655,3 +1837,54 @@ async def dashboard_redirect(
         return templates.TemplateResponse(request, "admin_dashboard.html", {"request": request, "current_user": current_user})
     else:
         return RedirectResponse(url="/login", status_code=303)
+
+
+# Добавьте в main.py (после других эндпоинтов)
+
+@app.get("/api/vk/auth")
+async def vk_auth_callback(
+        request: Request,
+        code: Optional[str] = Query(None),
+        db_cursor=Depends(get_db)
+):
+    """Callback для VK ID авторизации (OAuth)"""
+    if not code:
+        return RedirectResponse(url="/login?error=vk_auth_failed")
+
+    # Здесь будет обмен code на access_token
+    # Пока возвращаем заглушку
+    return {"status": "success", "message": "VK auth callback received"}
+
+
+@app.post("/api/vk/webhook")
+async def vk_webhook(
+        request: Request,
+        db_cursor=Depends(get_db)
+):
+    """Webhook для VK Callback API (альтернатива LongPoll)"""
+    try:
+        data = await request.json()
+
+        # Проверка на подтверждение сервера
+        if data.get("type") == "confirmation":
+            from config import VK_CONFIG
+            return {"response": VK_CONFIG.get("confirmation_code", "000000")}
+
+        # Обработка новых сообщений
+        if data.get("type") == "message_new":
+            from vk_bot import vk_bot_instance
+            if vk_bot_instance:
+                message = data["object"]["message"]
+                user_id = message["from_id"]
+                text = message.get("text", "")
+
+                response = vk_bot_instance.handle_message(user_id, text)
+                if response:
+                    vk_bot_instance.send_message(user_id, response)
+
+            return {"response": "ok"}
+
+        return {"response": "ok"}
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return {"response": "error"}
