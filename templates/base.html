@@ -1,0 +1,697 @@
+<!-- base.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Swim CRM - Учётная система бассейна{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            color: #0f172a;
+            position: relative;
+            overflow-x: hidden;
+            background: #0a2a4a;
+        }
+
+        /* Анимированная вода (задний фон) */
+        .water-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+            background: linear-gradient(180deg, #0a2a4a 0%, #0e3a5a 30%, #1a5a7a 60%, #2a8aba 100%);
+        }
+
+        /* Волны из простых фигур */
+        .wave {
+            position: absolute;
+            width: 200%;
+            height: 100px;
+            background: repeating-linear-gradient(
+                transparent 0px,
+                transparent 30px,
+                rgba(100, 180, 250, 0.3) 30px,
+                rgba(100, 180, 250, 0.3) 35px,
+                transparent 35px,
+                transparent 65px,
+                rgba(80, 160, 230, 0.2) 65px,
+                rgba(80, 160, 230, 0.2) 70px
+            );
+            bottom: 0;
+            left: -50%;
+            animation: waveMoveLeft 8s linear infinite;
+        }
+
+        .wave:nth-child(1) { bottom: 0; height: 80px; animation-duration: 6s; opacity: 0.7; }
+        .wave:nth-child(2) { bottom: 60px; height: 60px; animation-duration: 8s; opacity: 0.5; animation-delay: 1s; }
+        .wave:nth-child(3) { bottom: 110px; height: 50px; animation-duration: 10s; opacity: 0.4; animation-delay: 2s; }
+        .wave:nth-child(4) { bottom: 150px; height: 40px; animation-duration: 7s; opacity: 0.3; animation-delay: 0.5s; }
+        .wave:nth-child(5) { bottom: 190px; height: 35px; animation-duration: 9s; opacity: 0.25; animation-delay: 3s; }
+        .wave:nth-child(6) { bottom: 220px; height: 30px; animation-duration: 11s; opacity: 0.2; animation-delay: 1.5s; }
+        .wave:nth-child(7) { bottom: 250px; height: 25px; animation-duration: 12s; opacity: 0.15; animation-delay: 4s; }
+        .wave:nth-child(8) { bottom: 280px; height: 20px; animation-duration: 5s; opacity: 0.3; animation-delay: 2.5s; }
+
+        @keyframes waveMoveLeft {
+            0% {
+                transform: translateX(0) translateY(0);
+            }
+            50% {
+                transform: translateX(-25%) translateY(15px);
+            }
+            100% {
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        /* Круги на воде (брызги) */
+        .water-ripple-circle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: rippleExpand 3s ease-out infinite;
+        }
+
+        @keyframes rippleExpand {
+            0% {
+                width: 0;
+                height: 0;
+                opacity: 0.5;
+            }
+            100% {
+                width: 80px;
+                height: 80px;
+                opacity: 0;
+            }
+        }
+
+        /* Дельфины */
+        .dolphin {
+            position: absolute;
+            font-size: 45px;
+            cursor: pointer;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));
+            z-index: 2;
+        }
+
+        .dolphin i {
+            color: #4a9ebb;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        .dolphin:hover i {
+            transform: scale(1.1);
+        }
+
+        @keyframes dolphinSwim1 {
+            0% { left: -80px; top: 70%; transform: rotate(0deg); }
+            20% { left: 10%; top: 60%; transform: rotate(-5deg); }
+            40% { left: 30%; top: 55%; transform: rotate(0deg); }
+            50% {
+                left: 35%;
+                top: 40%;
+                transform: rotate(-25deg);
+            }
+            51% {
+                left: 35%;
+                top: 35%;
+                transform: rotate(-30deg);
+            }
+            60% {
+                left: 40%;
+                top: 45%;
+                transform: rotate(10deg);
+            }
+            70% { left: 55%; top: 60%; transform: rotate(0deg); }
+            90% { left: 85%; top: 65%; transform: rotate(5deg); }
+            100% { left: 110%; top: 70%; transform: rotate(0deg); }
+        }
+
+        @keyframes dolphinSwim2 {
+            0% { left: -100px; top: 75%; transform: rotate(0deg); }
+            25% { left: 15%; top: 65%; transform: rotate(-3deg); }
+            45% { left: 35%; top: 58%; transform: rotate(0deg); }
+            55% {
+                left: 40%;
+                top: 42%;
+                transform: rotate(-28deg);
+            }
+            56% {
+                left: 41%;
+                top: 38%;
+                transform: rotate(-35deg);
+            }
+            65% {
+                left: 45%;
+                top: 48%;
+                transform: rotate(15deg);
+            }
+            80% { left: 70%; top: 62%; transform: rotate(0deg); }
+            100% { left: 120%; top: 70%; transform: rotate(0deg); }
+        }
+
+        @keyframes dolphinSwim3 {
+            0% { left: -60px; top: 68%; transform: rotate(0deg); }
+            30% { left: 20%; top: 58%; transform: rotate(-4deg); }
+            50% { left: 38%; top: 52%; transform: rotate(0deg); }
+            60% {
+                left: 42%;
+                top: 38%;
+                transform: rotate(-32deg);
+            }
+            61% {
+                left: 43%;
+                top: 33%;
+                transform: rotate(-38deg);
+            }
+            70% {
+                left: 48%;
+                top: 44%;
+                transform: rotate(12deg);
+            }
+            85% { left: 75%; top: 60%; transform: rotate(0deg); }
+            100% { left: 115%; top: 66%; transform: rotate(0deg); }
+        }
+
+        @keyframes dolphinSwim4 {
+            0% { left: -50px; top: 72%; transform: rotate(0deg); }
+            22% { left: 12%; top: 62%; transform: rotate(-6deg); }
+            48% { left: 32%; top: 56%; transform: rotate(0deg); }
+            58% {
+                left: 38%;
+                top: 41%;
+                transform: rotate(-30deg);
+            }
+            59% {
+                left: 39%;
+                top: 36%;
+                transform: rotate(-36deg);
+            }
+            68% {
+                left: 44%;
+                top: 46%;
+                transform: rotate(14deg);
+            }
+            88% { left: 80%; top: 63%; transform: rotate(0deg); }
+            100% { left: 110%; top: 69%; transform: rotate(0deg); }
+        }
+
+        @keyframes dolphinIdle {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .dolphin-1 { animation: dolphinSwim1 14s ease-in-out infinite; }
+        .dolphin-2 { animation: dolphinSwim2 16s ease-in-out infinite; animation-delay: 3s; }
+        .dolphin-3 { animation: dolphinSwim3 18s ease-in-out infinite; animation-delay: 6s; }
+        .dolphin-4 { animation: dolphinSwim4 20s ease-in-out infinite; animation-delay: 9s; }
+
+        /* Брызги от дельфинов */
+        .splash {
+            position: absolute;
+            font-size: 20px;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 3;
+        }
+
+        @keyframes splashAnim {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            20% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(1.5) translateY(-30px);
+            }
+        }
+
+        /* Кит */
+        .whale {
+            position: fixed;
+            right: -200px;
+            bottom: 15%;
+            z-index: 15;
+            cursor: pointer;
+            animation: whaleEnter 2s ease-out forwards;
+        }
+
+        @keyframes whaleEnter {
+            0% {
+                right: -200px;
+            }
+            100% {
+                right: 20px;
+            }
+        }
+
+        .whale i {
+            font-size: 120px;
+            color: #2c5f8a;
+            filter: drop-shadow(5px 10px 15px rgba(0,0,0,0.3));
+            transition: transform 0.3s;
+        }
+
+        .whale:hover i {
+            transform: scale(1.05);
+        }
+
+        .whale-mouth {
+            position: absolute;
+            top: 45px;
+            right: 15px;
+            width: 0;
+            height: 0;
+            border-left: 40px solid #2c5f8a;
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .whale:hover .whale-mouth {
+            border-left: 55px solid #2c5f8a;
+        }
+
+        /* Облако с текстом от кита */
+        .whale-cloud {
+            position: absolute;
+            top: -80px;
+            right: 80px;
+            background: white;
+            border-radius: 50px;
+            padding: 15px 25px;
+            white-space: nowrap;
+            font-weight: 600;
+            color: #1e3a5f;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            pointer-events: none;
+            z-index: 20;
+            font-size: 18px;
+        }
+
+        .whale-cloud::before {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            right: 30px;
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 20px solid white;
+        }
+
+        .whale-cloud i {
+            margin-right: 8px;
+            color: #f59e0b;
+        }
+
+        .whale:hover .whale-cloud {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Навигация */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: #2563eb !important;
+            font-size: 1.5rem;
+        }
+
+        .navbar-brand i {
+            font-size: 1.8rem;
+            color: #3b82f6;
+        }
+
+        .nav-link {
+            color: #475569 !important;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-radius: 10px;
+            margin: 0 4px;
+        }
+
+        .nav-link:hover {
+            background: #3b82f6;
+            color: white !important;
+            transform: translateY(-2px);
+        }
+
+        .user-info {
+            background: #f1f5f9;
+            padding: 8px 16px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .user-type {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: #3b82f6;
+            color: white;
+        }
+
+        .logout-btn {
+            background: #ef4444 !important;
+            color: white !important;
+            border-radius: 8px;
+            padding: 6px 14px;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626 !important;
+            transform: translateY(-2px);
+        }
+
+        /* Кнопки */
+        .btn {
+            border-radius: 12px;
+            font-weight: 500;
+            padding: 10px 24px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-success {
+            background: #10b981;
+            border: none;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #cbd5e1;
+            color: #475569;
+        }
+
+        .btn-outline:hover {
+            border-color: #2563eb;
+            color: #2563eb;
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        /* Карточки */
+        .card {
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            padding: 20px 24px;
+        }
+
+        /* Формы */
+        .form-control, .form-select {
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Контейнер */
+        .container {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Футер */
+        .footer {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            color: #94a3b8;
+            text-align: center;
+            padding: 30px;
+            margin-top: 60px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .footer a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer a:hover {
+            color: #60a5fa;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2563eb;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            .btn {
+                padding: 8px 16px;
+            }
+            .whale i {
+                font-size: 70px;
+            }
+            .whale-cloud {
+                font-size: 10px;
+                padding: 8px 12px;
+                white-space: normal;
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Водный фон -->
+    <div class="water-background">
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+    </div>
+
+    <!-- Дельфины -->
+    <div class="dolphin dolphin-1">
+        <i class="fas fa-fish"></i>
+    </div>
+    <div class="dolphin dolphin-2">
+        <i class="fas fa-fish"></i>
+    </div>
+    <div class="dolphin dolphin-3">
+        <i class="fas fa-fish"></i>
+    </div>
+    <div class="dolphin dolphin-4">
+        <i class="fas fa-fish"></i>
+    </div>
+
+    <!-- Кит -->
+    <div class="whale">
+        <i class="fas fa-water"></i>
+        <div class="whale-mouth"></div>
+        <div class="whale-cloud">
+            <i class="fas fa-cloud"></i>
+            🐋 "Спорт - полезно для здоровья!" 🏊
+        </div>
+    </div>
+
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-swimmer"></i>
+                <span>Swim CRM</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center gap-2">
+                    {% if current_user %}
+                        {% if current_user.type == 'parent' %}
+                            <li class="nav-item"><a class="nav-link" href="/parent/profile"><i class="fas fa-user"></i> Мои дети</a></li>
+                        {% elif current_user.type == 'trainer' %}
+                            <li class="nav-item"><a class="nav-link" href="/trainer/dashboard"><i class="fas fa-chalkboard-user"></i> Мои группы</a></li>
+                        {% elif current_user.type == 'admin' %}
+                            <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="fas fa-tachometer-alt"></i> Дашборд</a></li>
+                            <li class="nav-item"><a class="nav-link" href="/trainer/dashboard"><i class="fas fa-users"></i> Все группы</a></li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <div class="user-info">
+                                <i class="fas fa-user-circle"></i>
+                                <span class="user-name">{{ current_user.name }}</span>
+                                <span class="user-type">
+                                    {% if current_user.type == 'parent' %}Родитель
+                                    {% elif current_user.type == 'trainer' %}Тренер
+                                    {% else %}Администратор{% endif %}
+                                </span>
+                                <a href="/logout" class="logout-btn" style="background: #ef4444; color: white; padding: 6px 14px; border-radius: 10px; text-decoration: none;">
+                                    <i class="fas fa-sign-out-alt"></i> Выйти
+                                </a>
+                            </div>
+                        </li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="/login"><i class="fas fa-sign-in-alt"></i> Вход</a></li>
+                        <li class="nav-item"><a class="btn btn-primary" href="/apply"><i class="fas fa-pen"></i> Записаться</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Основной контент -->
+    <main class="fade-in">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- Футер -->
+    <footer class="footer">
+        <p>&copy; 2024 Swim CRM - Система учёта бассейна</p>
+        <p class="mt-2">
+            <a href="/">Главная</a> |
+            <a href="/apply">Записаться</a> |
+            <a href="/login">Вход для сотрудников</a>
+        </p>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Автоматическое скрытие уведомлений через 5 секунд
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.5s ease';
+                alert.style.opacity = '0';
+                setTimeout(() => alert.remove(), 500);
+            });
+        }, 5000);
+
+        // Эффект брызг при наведении на дельфинов
+        const dolphins = document.querySelectorAll('.dolphin');
+        dolphins.forEach(dolphin => {
+            dolphin.addEventListener('mouseenter', function(e) {
+                const splash = document.createElement('div');
+                splash.className = 'splash';
+                splash.innerHTML = '💧💧💧';
+                splash.style.position = 'absolute';
+                splash.style.left = e.target.closest('.dolphin').offsetLeft + 30 + 'px';
+                splash.style.top = e.target.closest('.dolphin').offsetTop + 30 + 'px';
+                splash.style.animation = 'splashAnim 0.5s ease-out forwards';
+                document.body.appendChild(splash);
+                setTimeout(() => splash.remove(), 500);
+            });
+        });
+    </script>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>
