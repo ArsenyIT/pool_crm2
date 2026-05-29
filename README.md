@@ -3,11 +3,14 @@
 ### Для запуска приложения введите в окне терминала команду: 
 ### uvicorn main:app --reload
 ### База данных создастся автоматически
-## 2. Библиотеки
-### Установка библиотек тремя командами:
-### pip install fastapi uvicorn
-### pip install jinja2
-### pip install python-multipart
+## 2. Библиотеки, необходимые для работы приложения:
+- `fastapi` 
+- `uvicorn`
+- `jinja2`
+- `python-multipart`
+- `sqlalchemy`
+- `vk_api`
+- `bcrypt`
 
 # Database (Удалов Арсений)
 ## init_db.py
