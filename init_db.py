@@ -1,21 +1,36 @@
 # init_db.py
 import sqlite3
 import os
+import bcrypt
 from database import db_instance, get_db_cursor, DATABASE_PATH
 from datetime import datetime, time, date, timedelta
 
 # Словарь для хранения созданных паролей (для отладки и тестирования)
 created_credentials = {
+    "admins": [],  # Список админов с логинами и паролями
     "trainers": [],  # Список тренеров с логинами и паролями
     "parents": []  # Список родителей с телефонами
 }
 
 def hash_password(password: str) -> str:
     #Хеширует пароль с помощью bcrypt.
-    #Временная функция!!!
-    #ВРЕМЕННО: для тестов просто возвращаем пароль с префиксом!!!
-    #Потом здесь должен быть bcrypt.hashpw(password, bcrypt.gensalt())!!!
-    return f"hash_of_{password}"
+    if not password:
+        password = "default123"
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Проверяет соответствие пароля хешу"""
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'),
+            hashed_password.encode('utf-8')
+        )
+    except Exception:
+        return False
 
 def print_credentials():
     #Выводит все созданные учётные данные для тестирования
@@ -35,13 +50,13 @@ def print_credentials():
             print(f"   • {t['full_name']}: {t['login']} / {t['password']}")
 
     if created_credentials["parents"]:
-        print("\n👨‍👩‍👧 РОДИТЕЛИ (телефон для входа):")
+        print("\n👨‍👩‍👧 РОДИТЕЛИ (телефон для входа, пароль = телефон):")
         for p in created_credentials["parents"]:
-            print(f"   • {p['full_name']}: {p['phone']}")
+            print(f"   • {p['full_name']}: {p['phone']} / {p['phone']}")
 
     print("\n" + "=" * 60)
-    print("💡 Для входа родителям нужен ТОЛЬКО телефон (пароль не требуется)")
-    print("💡 Тренерам нужны логин И пароль")
+    print("💡 Для входа родителям нужен ТОЛЬКО телефон и пароль (по умолчанию = телефон)")
+    print("💡 Тренерам нужны логин и пароль")
     print("=" * 60 + "\n")
 
 def table_exists(cursor, table_name):
@@ -66,11 +81,12 @@ def create_tables():
                 phone VARCHAR(20) NOT NULL UNIQUE,
                 email VARCHAR(255),
                 vk_id VARCHAR(100) UNIQUE,
+                password_hash VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """) #id: Уникальный идентификатор родителя
-             #full_name: Полное имя родителя (Фамилия Имя Отчество)
+             #full_name: Полное имя родителя
              #phone: Номер телефона родителя
              #email: Электронная почта родителя
              #vk_id: Идентификатор пользователя ВКонтакте
@@ -89,6 +105,7 @@ def create_tables():
                 swimming_years INTEGER DEFAULT 1,
                 shift VARCHAR(10) CHECK (shift IN ('day', 'evening')),
                 desired_lessons_per_week INTEGER CHECK (desired_lessons_per_week IN (1,2,3)),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (parent_id) REFERENCES parents(id) ON DELETE CASCADE
             )
         """)    #id: Уникальный идентификатор ребёнка
@@ -344,9 +361,9 @@ def ensure_tables_exist():
 
 def seed_test_data():
     # Заполнение тестовыми данными для разработки
-
     global created_credentials # Очищаем список учётных данных перед новым заполнением
     created_credentials = {
+        "admins": [],
         "trainers": [],
         "parents": []
     }
@@ -360,6 +377,7 @@ def seed_test_data():
             count = cursor.fetchone()[0]  # Получаем число из первой колонки первой строки
             if count > 0:  # Если в таблице trainers уже есть данные (>0)
                 print("📊 Test data already exists, skipping seed")
+                print_credentials()
                 return  # Выходим из функции, ничего не делаем (данные уже есть)
         except sqlite3.OperationalError as e:
             # Обрабатываем ошибку "no such table" (нет такой таблицы)
@@ -372,10 +390,6 @@ def seed_test_data():
             raise e
 
         print("🌱 Seeding test data...")
-
-        #Хеш пароля для тестовых пользователей (пароль: "password123")
-        #В реальном проекте используйте bcrypt!
-        test_password_hash = "test_hash_replace_with_bcrypt"
 
         # 1. Создаём тренеров (trainers)
         trainers_data = [ # (full_name, phone, email, login, password, specialization)
@@ -392,21 +406,17 @@ def seed_test_data():
         for trainer in trainers_data:
             # Сохраняем учётные данные для вывода
             created_credentials["trainers"].append({
-                "full_name": trainer["full_name"],
-                "login": trainer["login"],
-                "password": trainer["password"]  # Сохраняем оригинальный пароль!
+                "full_name": trainer[0],
+                "login": trainer[3],
+                "password": trainer[4]  # Сохраняем оригинальный пароль!
             })
 
             # Хешируем пароль для БД
-            password_hash = hash_password(trainer["password"])
+            password_hash = hash_password(trainer[4])
 
             trainers_list.append((
-                trainer["full_name"],
-                trainer["phone"],
-                trainer["email"],
-                trainer["login"],
-                password_hash,
-                trainer["specialization"]
+                trainer[0], trainer[1], trainer[2],
+                trainer[3], password_hash, trainer[5]
             ))
 
         cursor.executemany("""
@@ -428,7 +438,7 @@ def seed_test_data():
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, groups_data)
 
-        # 3. Создаём родителей (parents)
+        # 3. Создаём родителей (parents) с хешированным паролем (пароль = телефон)
         parents_data = [ # (full_name, phone, email, vk_id)
             ("Сергей Петров", "+79123456789", "sergey@example.com", None),
             ("Ольга Сидорова", "+79234567890", "olga@example.com", None),
@@ -437,20 +447,19 @@ def seed_test_data():
 
         for parent in parents_data:
             created_credentials["parents"].append({
-                "full_name": parent["full_name"],
-                "phone": parent["phone"]
+                "full_name": parent[0],
+                "phone": parent[1]
             })
 
-        parents_list = [(p["full_name"], p["phone"], p["email"], p["vk_id"]) for p in parents_data]
-
-        cursor.executemany("""
-            INSERT INTO parents (full_name, phone, email, vk_id)
-            VALUES (?, ?, ?, ?)
-        """, parents_data)
+        password_hash = hash_password(parent[1])  # пароль = телефон
+        cursor.execute("""
+                        INSERT INTO parents (full_name, phone, email, vk_id, password_hash)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (parent[0], parent[1], parent[2], parent[3], password_hash))
 
         # 4. Создаём детей (children)
         children_data = [ # (parent_id, full_name, age, class_number,
-                                # school_name, swimming_years, shift, desired_lessons_per_week)
+                        # school_name, swimming_years, shift, desired_lessons_per_week)
             (1, "Алексей Петров", 7, 1, "Школа №1", 1, "day", 2),
             (1, "Мария Петрова", 5, 0, "Детский сад №5", 1, "day", 2),
             (2, "Екатерина Сидорова", 10, 3, "Школа №2", 2, "evening", 3),
@@ -464,10 +473,10 @@ def seed_test_data():
 
         # 5. Зачисляем детей в группы (enrollments)
         enrollments_data = [ # Связываем детей (child_id) с группами (group_id)
-            (1, 2),  # Алексей Петров(id=1) -> Рыбки (id=2)
-            (2, 1),  # Мария Петрова(id=2) -> Дельфинчики (id=1)
-            (3, 3),  # Екатерина Сидорова(id=3) -> Спортивная (id=3)
-            (4, 4),  # Иван Козлов(id=4) -> Продвинутая (id=4)
+            (1, 2),  # Алексей Петров -> Рыбки
+            (2, 1),  # Мария Петрова -> Дельфинчики
+            (3, 3),  # Екатерина Сидорова -> Спортивная
+            (4, 4),  # Иван Козлов -> Продвинутая
         ]
 
         cursor.executemany("""
@@ -499,10 +508,9 @@ def seed_test_data():
         today = date.today()  # Сегодняшняя дата (например, 2025-05-04)
         # Перебираем зачисления (каждого ученика)
         # enumerate(...) даёт номер (1,2,3,4) для enrollment_id
-        for i, enrollment in enumerate([(1, 2), (2, 1), (3, 3), (4, 4)], start=1):
-            child_id, group_id = enrollment
+        enrollments_ids = [(1, 2), (2, 1), (3, 3), (4, 4)]
+        for i, enrollment in enumerate(enrollments_ids, start=1):
             enrollment_id = i
-
             # Для каждого ученика создаём 3 отметки: вчера, 3 дня назад, 5 дней назад
             for days_ago in [1, 3, 5]:  # вчера, 3 дня назад, 5 дней назад
                 d = today - timedelta(days=days_ago)  # Вычисляем дату
@@ -532,35 +540,20 @@ def seed_test_data():
         """, applications_data)
 
         admins_list = [
-            {
-                "full_name": "Администратор",
-                "login": "admin",
-                "password": "admin123",
-                "email": "admin@swim.ru",
-                "phone": "+79001112233"
-            }
+            ("Администратор", "admin", "admin123", "admin@swim.ru", "+79001112233")
         ]
 
         # 9. Сохраняем учётные данные администратора
         admins_data = []
         for admin in admins_list:
-            # Сохраняем для вывода
+            # admin - кортеж: 0: full_name, 1: login, 2: password, 3: email, 4: phone
             created_credentials["admins"].append({
-                "full_name": admin["full_name"],
-                "login": admin["login"],
-                "password": admin["password"]
-            })
+                "full_name": admin[0],
+                "login": admin[1],
+                "password": admin[2]})
 
             # Хешируем пароль для БД
-            password_hash = hash_password(admin["password"])
-
-            admins_data.append((
-                admin["full_name"],
-                admin["login"],
-                password_hash,
-                admin["email"],
-                admin["phone"]
-            ))
+            password_hash = hash_password(admin[2])
 
         # Вставляем администратора
         cursor.executemany("""
