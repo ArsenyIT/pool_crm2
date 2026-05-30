@@ -1,57 +1,193 @@
+<!-- parent_profile.html -->
 {% extends "base.html" %}
 
-{% block title %}Личный кабинет родителя{% endblock %}
+{% block title %}Мои дети - Swim CRM{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Белая карточка-обертка -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white border-bottom">
-            <h3 class="mb-0">Мои дети</h3>
-        </div>
-        <div class="card-body">
-            {% if not children %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> У вас пока нет зачисленных детей.
-                    <a href="/apply" class="alert-link">Подайте заявку</a> на зачисление.
-                </div>
-            {% else %}
-                <div class="row">
-                    {% for child in children %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <i class="fas fa-child"></i> {{ child.full_name }}
-                                </h5>
-                                <p class="card-text">
-                                    <strong>Возраст:</strong> {{ child.age }} лет<br>
-                                    <strong>Школа:</strong> {{ child.school_name }}<br>
-                                    <strong>Класс:</strong> {{ child.class_number or '—' }}<br>
-                                    <strong>Смена:</strong> {% if child.shift == 'day' %}Дневная{% else %}Вечерняя{% endif %}<br>
-                                    <strong>Лет обучения:</strong> {{ child.swimming_years }}<br>
-                                    <strong>Занятий в неделю:</strong> {{ child.desired_lessons_per_week }}
-                                </p>
-                                {% if child.group %}
-                                <div class="alert alert-success">
-                                    <strong>Группа:</strong> {{ child.group.name }}<br>
-                                    <strong>Тренер:</strong> {{ child.group.trainer_name or 'Не назначен' }}
-                                </div>
-                                {% else %}
-                                <div class="alert alert-warning">
-                                    Не зачислен в группу
-                                </div>
-                                {% endif %}
-                                <a href="/parent/child/{{ child.id }}" class="btn btn-primary">
-                                    <i class="fas fa-eye"></i> Подробнее
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-user-friends"></i> Мои дети</h1>
+        <div class="d-flex gap-3">
+            <a href="/apply" class="btn btn-success">
+                <i class="fas fa-plus"></i> Записать ребёнка
+            </a>
+            <!-- СИНЯЯ ДИНАМИЧЕСКАЯ КНОПКА ВКОНТАКТЕ -->
+            <a href="https://vk.com/club239120595" target="_blank" class="btn btn-vk" id="vkBotBtn">
+                <i class="fab fa-vk"></i> ВК БОТ
+                <span class="btn-badge">online</span>
+            </a>
         </div>
     </div>
+
+    {% if children %}
+        <div class="children-grid">
+            {% for child in children %}
+                <div class="child-card">
+                    <div class="child-name">
+                        <i class="fas fa-child"></i> {{ child.full_name }}
+                    </div>
+                    <div class="child-info">
+                        <div class="child-info-item">
+                            <label>Возраст:</label>
+                            <span>{{ child.age }} лет</span>
+                        </div>
+                        <div class="child-info-item">
+                            <label>Школа:</label>
+                            <span>{{ child.school_name }}</span>
+                        </div>
+                        <div class="child-info-item">
+                            <label>Смена:</label>
+                            <span>{{ 'Дневная' if child.shift == 'day' else 'Вечерняя' }}</span>
+                        </div>
+                        {% if child.group %}
+                            <div class="child-info-item">
+                                <label>Группа:</label>
+                                <span><strong>{{ child.group.name }}</strong></span>
+                            </div>
+                            <div class="child-info-item">
+                                <label>Тренер:</label>
+                                <span>{{ child.group.trainer_name }}</span>
+                            </div>
+                        {% else %}
+                            <div class="child-info-item">
+                                <label>Группа:</label>
+                                <span class="status-absent">Не зачислен</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="form-actions" style="justify-content: flex-start; margin-top: 10px;">
+                        <a href="/parent/child/{{ child.id }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-eye"></i> Подробнее
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body" style="text-align: center;">
+                <div class="empty-icon">
+                    <i class="fas fa-child fa-4x"></i>
+                </div>
+                <p>У вас пока нет зарегистрированных детей</p>
+                <a href="/apply" class="btn btn-primary">Записать ребёнка на занятия</a>
+            </div>
+        </div>
+    {% endif %}
 </div>
+
+<style>
+    /* Стили для кнопки ВКонтакте */
+    .btn-vk {
+        background: linear-gradient(135deg, #4a76a8 0%, #2c5888 100%);
+        color: white;
+        border: none;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        padding: 10px 24px;
+        border-radius: 40px;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(74, 118, 168, 0.3);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-vk i {
+        font-size: 1.2rem;
+        transition: transform 0.3s ease;
+    }
+
+    .btn-vk:hover {
+        background: linear-gradient(135deg, #5a86b8 0%, #3c6898 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(74, 118, 168, 0.4);
+        color: white;
+    }
+
+    .btn-vk:hover i {
+        transform: scale(1.1);
+    }
+
+    .btn-vk:active {
+        transform: translateY(1px);
+    }
+
+    /* Бейдж "онлайн" */
+    .btn-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #4cd964;
+        color: white;
+        font-size: 0.65rem;
+        font-weight: bold;
+        padding: 3px 8px;
+        border-radius: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        50% {
+            transform: scale(1.1);
+            opacity: 0.8;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    /* Эффект пульсации при наведении */
+    .btn-vk::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .btn-vk:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+</style>
+
+<script>
+    // Динамическая анимация для кнопки ВК БОТ
+    document.addEventListener('DOMContentLoaded', function() {
+        const vkBtn = document.getElementById('vkBotBtn');
+        if (vkBtn) {
+            // Меняем текст бейджа через каждые 5 секунд
+            const badge = vkBtn.querySelector('.btn-badge');
+            const texts = ['online', 'active', 'live', 'online'];
+            let index = 0;
+
+            setInterval(() => {
+                if (badge) {
+                    index = (index + 1) % texts.length;
+                    badge.textContent = texts[index];
+
+                    // Добавляем эффект мигания при смене текста
+                    badge.style.transform = 'scale(1.2)';
+                    setTimeout(() => {
+                        if (badge) badge.style.transform = 'scale(1)';
+                    }, 200);
+                }
+            }, 3000);
+        }
+    });
+</script>
 {% endblock %}
