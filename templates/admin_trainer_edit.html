@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование тренера{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            {% if request.query_params.get('success') == 'updated' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                Данные тренера успешно обновлены
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Редактирование тренера</h4>
+                </div>
+                <div class="card-body">
+                    <form action="/admin/trainer/{{ trainer.id }}/edit" method="post">
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">ФИО *</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name" value="{{ trainer.full_name }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Телефон *</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" value="{{ trainer.phone }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ trainer.email }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="login" class="form-label">Логин *</label>
+                            <input type="text" class="form-control" id="login" name="login" value="{{ trainer.login }}" required>
+                            <div class="form-text">Уникальное имя пользователя для входа</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Новый пароль</label>
+                            <input type="password" class="form-control" id="password" name="password" placeholder="Оставьте пустым, чтобы не менять">
+                            <div class="form-text">Введите новый пароль только если хотите его изменить</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="specialization" class="form-label">Специализация</label>
+                            <textarea class="form-control" id="specialization" name="specialization" rows="3">{{ trainer.specialization or '' }}</textarea>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" value="true" {% if trainer.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="is_active">Активен</label>
+                            <div class="form-text">Неактивные тренеры не могут быть назначены на группы</div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>Информация:</strong> Пароль хранится в зашифрованном виде. Вы не можете его просмотреть, только изменить.
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/admin/trainers" class="btn btn-secondary me-md-2">Отмена</a>
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {% if trainer.is_active %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Группы тренера</h5>
+                </div>
+                <div class="card-body">
+                    <div id="trainerGroups">
+                        <!-- Здесь можно добавить список групп тренера -->
+                        <p class="text-muted">Загрузка групп...</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Загрузка групп тренера через API (опционально)
+{% if trainer.is_active %}
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/admin/api/trainer/{{ trainer.id }}/groups')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('trainerGroups');
+            if (data.groups && data.groups.length > 0) {
+                let html = '<ul class="list-group">';
+                data.groups.forEach(group => {
+                    html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${group.name}
+                                <span class="badge bg-primary rounded-pill">${group.enrolled || 0} учеников</span>
+                             </li>`;
+                });
+                html += '</ul>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<p class="text-muted">Нет назначенных групп</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка загрузки групп:', error);
+            document.getElementById('trainerGroups').innerHTML = '<p class="text-danger">Не удалось загрузить группы</p>';
+        });
+});
+{% endif %}
+</script>
+{% endblock %}

@@ -1605,18 +1605,35 @@ async def update_trainer(
 
 @app.post("/admin/trainer/{trainer_id}/delete")
 async def delete_trainer(
-    request: Request,
-    trainer_id: int,
-    current_user = Depends(get_current_user),
-    db_cursor = Depends(get_db)
+        request: Request,
+        trainer_id: int,
+        current_user=Depends(get_current_user),
+        db_cursor=Depends(get_db)
 ):
+    require_admin(current_user)
+
+    # Проверяем, не пытается ли админ удалить сам себя
     if trainer_id == current_user["id"]:
         raise HTTPException(status_code=400, detail="Нельзя удалить самого себя")
 
-    # При удалении тренера снимаем привязку групп (trainer_id -> NULL)
-    db_cursor.execute("UPDATE groups SET trainer_id = NULL WHERE trainer_id = ?", (trainer_id,))
+    # Проверяем, есть ли у тренера группы
+    db_cursor.execute("SELECT COUNT(*) as count FROM groups WHERE trainer_id = ?", (trainer_id,))
+    groups_count = db_cursor.fetchone()["count"]
+
+    if groups_count > 0:
+        # Сначала отвязываем тренера от всех групп (устанавливаем trainer_id = NULL)
+        db_cursor.execute("UPDATE groups SET trainer_id = NULL WHERE trainer_id = ?", (trainer_id,))
+        db_cursor.connection.commit()
+        print(f"✅ Отвязан тренер {trainer_id} от {groups_count} групп")
+
+    # Теперь можно удалить тренера
     db_cursor.execute("DELETE FROM trainers WHERE id = ?", (trainer_id,))
     db_cursor.connection.commit()
+
+    # Проверяем, был ли удален тренер
+    if db_cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Тренер не найден")
+
     return RedirectResponse(url="/admin/trainers?success=deleted", status_code=303)
 
 
