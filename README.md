@@ -11,6 +11,7 @@
 - `sqlalchemy`
 - `vk_api`
 - `bcrypt`
+### Устанавливаются через файл requirements.txt (pip install -r requirements.txt)
 
 # Database (Удалов Арсений)
 ## init_db.py
@@ -48,17 +49,19 @@
 2) Выводим справку (help)
 3) sys.exit(0) Выходим из программы с кодом 0 (успешное завершение)
 4) command = sys.argv[1] Берём первый аргумент (команду)
-5) if command == "create": create_tables() Создание таблиц 
-6) elif command == "seed": seed_test_data() Заполнение тестовыми данными 
-7) elif command == "reset": reset_database() Полный сброс (удаление + создание + заполнение)
-8) elif command == "drop": drop_all_tables() Удаление всех таблиц 
-9) elif command == "recreate": recreate_database() Пересоздание с удалением файла 
-10) elif command == "show": show_tables() Показать список таблиц 
-11) elif command == "info": get_database_info() Показать подробную информацию о БД 
-12) elif command == "full": create_full_database() Создать полную БД (таблицы + данные)
-13) else: Если команда не распознана 
-14) print(f"❌ Unknown command: {command}")
-15) print("Use: create, seed, reset, drop, recreate, show, info, full")
+5) Проверка команды:
+* if command == "create": create_tables() Создание таблиц 
+* elif command == "seed": seed_test_data() Заполнение тестовыми данными 
+* elif command == "reset": reset_database() Полный сброс (удаление + создание + заполнение)
+* elif command == "drop": drop_all_tables() Удаление всех таблиц 
+* elif command == "recreate": recreate_database() Пересоздание с удалением файла 
+* elif command == "show": show_tables() Показать список таблиц 
+* elif command == "info": get_database_info() Показать подробную информацию о БД 
+* elif command == "full": create_full_database() Создать полную БД (таблицы + данные)
+* else: Если команда не распознана
+6) Вывод при else:
+* print(f"❌ Unknown command: {command}")
+* print("Use: create, seed, reset, drop, recreate, show, info, full")
 ### 5. Индексы для производительности:
 * Индекс на внешний ключ родителя в таблице children
 * Индекс на ID ребёнка в таблице зачислений 
