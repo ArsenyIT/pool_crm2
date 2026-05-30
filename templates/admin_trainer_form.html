@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Добавление тренера{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Добавление нового тренера</h4>
+                </div>
+                <div class="card-body">
+                    <form action="/admin/trainer/create" method="post">
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">ФИО *</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Телефон *</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" required placeholder="+7 (XXX) XXX-XX-XX">
+                            <div class="form-text">Формат: +7XXXXXXXXXX</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="login" class="form-label">Логин *</label>
+                            <input type="text" class="form-control" id="login" name="login" required>
+                            <div class="form-text">Уникальное имя пользователя для входа</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Пароль *</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <div class="form-text">Пароль будет храниться в зашифрованном виде</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="specialization" class="form-label">Специализация</label>
+                            <textarea class="form-control" id="specialization" name="specialization" rows="3" placeholder="Например: обучение плаванию детей, спортивное плавание, аквааэробика и т.д."></textarea>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" value="true" checked>
+                            <label class="form-check-label" for="is_active">Активен</label>
+                            <div class="form-text">Неактивные тренеры не могут быть назначены на группы</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/admin/trainers" class="btn btn-secondary me-md-2">Отмена</a>
+                            <button type="submit" class="btn btn-primary">Добавить тренера</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
