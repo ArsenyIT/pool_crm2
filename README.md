@@ -296,17 +296,6 @@ Swim CRM - это веб-приложение для управления зан
 - Таблицы с горизонтальным скроллом
 - Навигация с бургер-меню (Bootstrap)
 
-## Иконки (Fotn Awesome 6)
-'''html 
-<i class="fas fa-swimmer"></i> <!-- плавание -->
-<i class="fas fa-child"></i>  <!-- ребёнок -->
-<i class="fas fa-users"></i>  <!-- группа -->
-<i class="fas fa-calendar"></i> <!-- календарь -->
-<i class="fas fa-check"></i>  <!-- подтверждение -->
-<i class="fas fa-times"></i>  <!-- отмена -->
-<i class="fas fa-edit"></i>  <!-- редактирование -->
-<i class="fas fa-trash"></i>  <!-- удаление -->'''
-
 # Взаимодействие Database с BACKEND и FRONTEND (Удалов Арсений)
 
 В таблице описаны ключевые сценарии работы CRM‑системы бассейна.  
